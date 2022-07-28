@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" ><generator uri="https://jekyllrb.com/" version="4.2.2">Jekyll</generator><link href="http://localhost:4000/feed.xml" rel="self" type="application/atom+xml" /><link href="http://localhost:4000/" rel="alternate" type="text/html" /><updated>2022-07-28T15:59:25+08:00</updated><id>http://localhost:4000/feed.xml</id><title type="html">this is a title</title><subtitle>stay foolish, stay hungry</subtitle><entry><title type="html">java实现带过期时间的lru</title><link href="http://localhost:4000/java/%E7%BB%8F%E5%85%B8%E9%9D%A2%E8%AF%95%E9%A2%98/2022/07/28/java%E5%AE%9E%E7%8E%B0%E5%B8%A6%E8%BF%87%E6%9C%9F%E6%97%B6%E9%97%B4%E7%9A%84.html" rel="alternate" type="text/html" title="java实现带过期时间的lru" /><published>2022-07-28T14:12:52+08:00</published><updated>2022-07-28T14:12:52+08:00</updated><id>http://localhost:4000/java/%E7%BB%8F%E5%85%B8%E9%9D%A2%E8%AF%95%E9%A2%98/2022/07/28/java%E5%AE%9E%E7%8E%B0%E5%B8%A6%E8%BF%87%E6%9C%9F%E6%97%B6%E9%97%B4%E7%9A%84</id><content type="html" xml:base="http://localhost:4000/java/%E7%BB%8F%E5%85%B8%E9%9D%A2%E8%AF%95%E9%A2%98/2022/07/28/java%E5%AE%9E%E7%8E%B0%E5%B8%A6%E8%BF%87%E6%9C%9F%E6%97%B6%E9%97%B4%E7%9A%84.html"><![CDATA[<p>用java实现带缓存时间的lru,只是一个简单的例子，还有很多不足，例如lru中的元素过期了不能及时删除，只有在put或者get的时候才会进行删除操作，同时，对于put了相同key的元素，没有更新该元素的时间戳以及新值</p>
+
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">package</span> <span class="nn">com.example.demo</span><span class="o">;</span>
+
+<span class="kn">import</span> <span class="nn">java.util.HashMap</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">java.util.Map</span><span class="o">;</span>
+
+<span class="cm">/**
+ * @author: elon
+ * @date: 2022/7/28
+ **/</span>
+<span class="kd">public</span> <span class="kd">class</span> <span class="nc">LRU</span><span class="o">&lt;</span><span class="no">K</span><span class="o">,</span><span class="no">V</span><span class="o">&gt;</span> <span class="o">{</span>
+
+    <span class="kd">private</span> <span class="nc">Map</span><span class="o">&lt;</span><span class="no">K</span><span class="o">,</span><span class="no">V</span><span class="o">&gt;</span> <span class="n">valueMap</span> <span class="o">=</span> <span class="k">new</span> <span class="nc">HashMap</span><span class="o">&lt;&gt;();</span>
+
+    <span class="kd">private</span> <span class="nc">Node</span><span class="o">&lt;</span><span class="no">K</span><span class="o">&gt;</span> <span class="n">head</span> <span class="o">=</span> <span class="k">new</span> <span class="nc">Node</span><span class="o">&lt;&gt;();</span>
+
+    <span class="kd">private</span> <span class="nc">Node</span><span class="o">&lt;</span><span class="no">K</span><span class="o">&gt;</span> <span class="n">tail</span> <span class="o">=</span> <span class="n">head</span><span class="o">;</span>
+    <span class="kd">private</span> <span class="kt">int</span> <span class="n">limit</span><span class="o">;</span>
+
+    <span class="kd">private</span> <span class="kt">long</span> <span class="n">lifeCycle</span><span class="o">;</span>
+    <span class="kd">private</span> <span class="kt">int</span> <span class="n">size</span><span class="o">;</span>
+
+    <span class="kd">public</span> <span class="nf">LRU</span> <span class="o">(</span><span class="kt">int</span> <span class="n">limit</span><span class="o">,</span> <span class="kt">long</span> <span class="n">lifeCycle</span><span class="o">)</span> <span class="o">{</span>
+        <span class="k">this</span><span class="o">.</span><span class="na">limit</span> <span class="o">=</span> <span class="n">limit</span><span class="o">;</span>
+        <span class="k">this</span><span class="o">.</span><span class="na">lifeCycle</span> <span class="o">=</span> <span class="n">lifeCycle</span><span class="o">;</span>
+    <span class="o">}</span>
+
+    <span class="kd">public</span> <span class="no">V</span> <span class="nf">get</span><span class="o">(</span><span class="no">K</span> <span class="n">key</span><span class="o">)</span> <span class="o">{</span>
+        <span class="kt">long</span> <span class="n">current</span> <span class="o">=</span> <span class="nc">System</span><span class="o">.</span><span class="na">currentTimeMillis</span><span class="o">();</span>
+        <span class="k">if</span> <span class="o">(</span><span class="k">this</span><span class="o">.</span><span class="na">valueMap</span><span class="o">.</span><span class="na">getOrDefault</span><span class="o">(</span><span class="n">key</span><span class="o">,</span> <span class="kc">null</span><span class="o">)</span> <span class="o">==</span> <span class="kc">null</span><span class="o">)</span> <span class="o">{</span>
+            <span class="k">return</span> <span class="kc">null</span><span class="o">;</span>
+        <span class="o">}</span>
+        <span class="nc">Node</span> <span class="n">t</span> <span class="o">=</span> <span class="n">findeNode</span><span class="o">(</span><span class="n">key</span><span class="o">);</span>
+        <span class="k">if</span> <span class="o">((</span><span class="n">current</span> <span class="o">-</span> <span class="n">t</span><span class="o">.</span><span class="na">timestamp</span><span class="o">)</span> <span class="o">&gt;</span> <span class="k">this</span><span class="o">.</span><span class="na">lifeCycle</span><span class="o">)</span> <span class="o">{</span>
+            <span class="n">removeAllAfter</span><span class="o">(</span><span class="n">key</span><span class="o">);</span>
+            <span class="k">return</span> <span class="kc">null</span><span class="o">;</span>
+        <span class="o">}</span>
+
+        <span class="n">remove</span><span class="o">(</span><span class="n">key</span><span class="o">);</span>
+        <span class="nc">Node</span> <span class="n">node</span> <span class="o">=</span> <span class="k">new</span> <span class="nc">Node</span><span class="o">(</span><span class="n">key</span><span class="o">,</span><span class="n">current</span><span class="o">);</span>
+        <span class="n">add2Head</span><span class="o">(</span><span class="n">node</span><span class="o">);</span>
+        <span class="n">print</span><span class="o">();</span>
+        <span class="k">return</span> <span class="n">valueMap</span><span class="o">.</span><span class="na">get</span><span class="o">(</span><span class="n">key</span><span class="o">);</span>
+    <span class="o">}</span>
+
+    <span class="kd">public</span> <span class="kt">void</span> <span class="nf">print</span><span class="o">()</span> <span class="o">{</span>
+        <span class="nc">Node</span> <span class="n">p</span> <span class="o">=</span> <span class="k">this</span><span class="o">.</span><span class="na">head</span><span class="o">;</span>
+        <span class="k">while</span><span class="o">(</span><span class="n">p</span><span class="o">.</span><span class="na">next</span> <span class="o">!=</span> <span class="kc">null</span><span class="o">)</span> <span class="o">{</span>
+            <span class="nc">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">print</span><span class="o">(</span><span class="n">p</span><span class="o">.</span><span class="na">next</span><span class="o">.</span><span class="na">key</span> <span class="o">+</span> <span class="s">"\t"</span><span class="o">);</span>
+            <span class="n">p</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="na">next</span><span class="o">;</span>
+        <span class="o">}</span>
+        <span class="nc">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">();</span>
+    <span class="o">}</span>
+    <span class="kd">public</span> <span class="kt">void</span> <span class="nf">put</span><span class="o">(</span><span class="no">K</span> <span class="n">key</span><span class="o">,</span> <span class="no">V</span> <span class="n">value</span><span class="o">)</span> <span class="o">{</span>
+        <span class="kt">long</span> <span class="n">current</span> <span class="o">=</span> <span class="nc">System</span><span class="o">.</span><span class="na">currentTimeMillis</span><span class="o">();</span>
+        <span class="nc">Node</span><span class="o">&lt;</span><span class="no">K</span><span class="o">&gt;</span> <span class="n">node</span> <span class="o">=</span> <span class="k">new</span> <span class="nc">Node</span><span class="o">&lt;&gt;(</span><span class="n">key</span><span class="o">,</span><span class="n">current</span><span class="o">);</span>
+        <span class="k">if</span> <span class="o">(</span><span class="n">expire</span><span class="o">(</span><span class="n">current</span><span class="o">)</span> <span class="o">||</span> <span class="k">this</span><span class="o">.</span><span class="na">size</span> <span class="o">==</span> <span class="k">this</span><span class="o">.</span><span class="na">limit</span><span class="o">)</span> <span class="o">{</span>
+            <span class="n">remove</span><span class="o">(</span><span class="k">this</span><span class="o">.</span><span class="na">tail</span><span class="o">.</span><span class="na">key</span><span class="o">);</span>
+            <span class="k">this</span><span class="o">.</span><span class="na">valueMap</span><span class="o">.</span><span class="na">remove</span><span class="o">(</span><span class="k">this</span><span class="o">.</span><span class="na">tail</span><span class="o">.</span><span class="na">key</span><span class="o">);</span>
+        <span class="o">}</span>
+        <span class="n">add2Head</span><span class="o">(</span><span class="n">node</span><span class="o">);</span>
+        <span class="k">this</span><span class="o">.</span><span class="na">valueMap</span><span class="o">.</span><span class="na">put</span><span class="o">(</span><span class="n">key</span><span class="o">,</span> <span class="n">value</span><span class="o">);</span>
+        <span class="n">print</span><span class="o">();</span>
+    <span class="o">}</span>
+
+    <span class="kd">private</span> <span class="kt">void</span> <span class="nf">add2Head</span><span class="o">(</span><span class="nc">Node</span> <span class="n">node</span><span class="o">)</span> <span class="o">{</span>
+        <span class="nc">Node</span> <span class="n">headNext</span> <span class="o">=</span> <span class="k">this</span><span class="o">.</span><span class="na">head</span><span class="o">.</span><span class="na">next</span><span class="o">;</span>
+        <span class="k">this</span><span class="o">.</span><span class="na">head</span><span class="o">.</span><span class="na">next</span> <span class="o">=</span> <span class="n">node</span><span class="o">;</span>
+        <span class="n">node</span><span class="o">.</span><span class="na">pre</span> <span class="o">=</span> <span class="k">this</span><span class="o">.</span><span class="na">head</span><span class="o">;</span>
+        <span class="n">node</span><span class="o">.</span><span class="na">next</span> <span class="o">=</span> <span class="n">headNext</span><span class="o">;</span>
+        <span class="k">if</span> <span class="o">(</span><span class="k">this</span><span class="o">.</span><span class="na">size</span> <span class="o">==</span> <span class="mi">0</span><span class="o">)</span> <span class="o">{</span>
+            <span class="n">tail</span> <span class="o">=</span> <span class="n">node</span><span class="o">;</span>
+        <span class="o">}</span>
+        <span class="k">if</span> <span class="o">(</span><span class="n">headNext</span> <span class="o">!=</span> <span class="kc">null</span><span class="o">)</span> <span class="o">{</span>
+            <span class="n">headNext</span><span class="o">.</span><span class="na">pre</span> <span class="o">=</span> <span class="n">node</span><span class="o">;</span>
+        <span class="o">}</span>
+        <span class="k">this</span><span class="o">.</span><span class="na">size</span> <span class="o">+=</span> <span class="mi">1</span><span class="o">;</span>
+    <span class="o">}</span>
+
+    <span class="kd">private</span> <span class="kt">void</span> <span class="nf">removeAllAfter</span><span class="o">(</span><span class="no">K</span> <span class="n">key</span><span class="o">)</span> <span class="o">{</span>
+        <span class="nc">Node</span> <span class="n">node</span> <span class="o">=</span> <span class="n">findeNode</span><span class="o">(</span><span class="n">key</span><span class="o">);</span>
+        <span class="nc">Node</span> <span class="n">pre</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="na">pre</span><span class="o">;</span>
+        <span class="n">pre</span><span class="o">.</span><span class="na">next</span> <span class="o">=</span> <span class="kc">null</span><span class="o">;</span>
+        <span class="n">tail</span> <span class="o">=</span> <span class="n">pre</span><span class="o">;</span>
+
+        <span class="kt">int</span> <span class="n">cnt</span> <span class="o">=</span> <span class="mi">0</span><span class="o">;</span>
+        <span class="k">while</span> <span class="o">(</span><span class="n">node</span> <span class="o">!=</span> <span class="kc">null</span><span class="o">)</span> <span class="o">{</span>
+            <span class="n">valueMap</span><span class="o">.</span><span class="na">remove</span><span class="o">(</span><span class="n">node</span><span class="o">.</span><span class="na">key</span><span class="o">);</span>
+            <span class="n">cnt</span><span class="o">++;</span>
+            <span class="n">node</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="na">next</span><span class="o">;</span>
+        <span class="o">}</span>
+        <span class="k">this</span><span class="o">.</span><span class="na">size</span> <span class="o">-=</span> <span class="n">cnt</span><span class="o">;</span>
+    <span class="o">}</span>
+
+    <span class="kd">private</span> <span class="kt">void</span> <span class="nf">remove</span><span class="o">(</span><span class="no">K</span> <span class="n">key</span><span class="o">)</span> <span class="o">{</span>
+        <span class="k">if</span> <span class="o">(</span><span class="n">key</span> <span class="o">==</span> <span class="n">tail</span><span class="o">.</span><span class="na">key</span><span class="o">)</span> <span class="o">{</span>
+            <span class="nc">Node</span> <span class="n">tailPre</span> <span class="o">=</span> <span class="n">tail</span><span class="o">.</span><span class="na">pre</span><span class="o">;</span>
+            <span class="n">tailPre</span><span class="o">.</span><span class="na">next</span> <span class="o">=</span> <span class="kc">null</span><span class="o">;</span>
+            <span class="n">tail</span> <span class="o">=</span> <span class="n">tailPre</span><span class="o">;</span>
+        <span class="o">}</span> <span class="k">else</span> <span class="o">{</span>
+            <span class="nc">Node</span> <span class="n">p</span> <span class="o">=</span> <span class="k">this</span><span class="o">.</span><span class="na">head</span><span class="o">;</span>
+            <span class="k">while</span><span class="o">(</span><span class="n">p</span><span class="o">.</span><span class="na">next</span> <span class="o">!=</span> <span class="kc">null</span><span class="o">)</span> <span class="o">{</span>
+                <span class="k">if</span> <span class="o">(</span><span class="n">p</span><span class="o">.</span><span class="na">next</span><span class="o">.</span><span class="na">key</span> <span class="o">==</span> <span class="n">key</span><span class="o">)</span> <span class="o">{</span>
+                    <span class="nc">Node</span> <span class="n">next</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="na">next</span><span class="o">.</span><span class="na">next</span><span class="o">;</span>
+                    <span class="n">p</span><span class="o">.</span><span class="na">next</span> <span class="o">=</span> <span class="n">next</span><span class="o">;</span>
+                    <span class="n">next</span><span class="o">.</span><span class="na">pre</span> <span class="o">=</span> <span class="n">p</span><span class="o">;</span>
+                    <span class="k">break</span><span class="o">;</span>
+                <span class="o">}</span>
+                <span class="n">p</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="na">next</span><span class="o">;</span>
+            <span class="o">}</span>
+        <span class="o">}</span>
+        <span class="k">this</span><span class="o">.</span><span class="na">size</span> <span class="o">-=</span> <span class="mi">1</span><span class="o">;</span>
+    <span class="o">}</span>
+    
+    <span class="kd">private</span> <span class="nc">Node</span> <span class="nf">findeNode</span><span class="o">(</span><span class="no">K</span> <span class="n">key</span><span class="o">)</span> <span class="o">{</span>
+        <span class="nc">Node</span> <span class="n">p</span> <span class="o">=</span> <span class="k">this</span><span class="o">.</span><span class="na">head</span><span class="o">;</span>
+        <span class="k">while</span> <span class="o">(</span><span class="n">p</span><span class="o">.</span><span class="na">next</span> <span class="o">!=</span> <span class="kc">null</span><span class="o">)</span> <span class="o">{</span>
+            <span class="k">if</span> <span class="o">(</span><span class="n">p</span><span class="o">.</span><span class="na">next</span><span class="o">.</span><span class="na">key</span> <span class="o">==</span> <span class="n">key</span><span class="o">)</span> <span class="o">{</span>
+                <span class="k">return</span> <span class="n">p</span><span class="o">.</span><span class="na">next</span><span class="o">;</span>
+            <span class="o">}</span>
+            <span class="n">p</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="na">next</span><span class="o">;</span>
+        <span class="o">}</span>
+        <span class="k">return</span> <span class="kc">null</span><span class="o">;</span>
+    <span class="o">}</span>
+
+    <span class="kd">private</span> <span class="kt">boolean</span> <span class="nf">expire</span><span class="o">(</span><span class="kt">long</span> <span class="n">current</span><span class="o">)</span> <span class="o">{</span>
+        <span class="k">if</span> <span class="o">(</span><span class="k">this</span><span class="o">.</span><span class="na">tail</span><span class="o">.</span><span class="na">timestamp</span> <span class="o">==</span> <span class="mi">0</span><span class="o">)</span> <span class="o">{</span><span class="k">return</span> <span class="kc">false</span><span class="o">;}</span>
+        <span class="k">return</span> <span class="o">(</span><span class="n">current</span> <span class="o">-</span> <span class="k">this</span><span class="o">.</span><span class="na">tail</span><span class="o">.</span><span class="na">timestamp</span><span class="o">)</span> <span class="o">&gt;</span> <span class="k">this</span><span class="o">.</span><span class="na">lifeCycle</span><span class="o">;</span>
+    <span class="o">}</span>
+    <span class="kd">static</span> <span class="kd">class</span> <span class="nc">Node</span><span class="o">&lt;</span><span class="no">K</span><span class="o">&gt;</span> <span class="o">{</span>
+        <span class="kt">long</span> <span class="n">timestamp</span><span class="o">;</span>
+        <span class="no">K</span> <span class="n">key</span><span class="o">;</span>
+        <span class="nc">Node</span><span class="o">&lt;</span><span class="no">K</span><span class="o">&gt;</span> <span class="n">pre</span><span class="o">;</span>
+        <span class="nc">Node</span><span class="o">&lt;</span><span class="no">K</span><span class="o">&gt;</span> <span class="n">next</span><span class="o">;</span>
+
+        <span class="kd">public</span> <span class="nf">Node</span><span class="o">(</span><span class="no">K</span> <span class="n">key</span><span class="o">,</span> <span class="kt">long</span> <span class="n">timestamp</span><span class="o">)</span> <span class="o">{</span>
+            <span class="k">this</span><span class="o">.</span><span class="na">key</span> <span class="o">=</span> <span class="n">key</span><span class="o">;</span>
+            <span class="k">this</span><span class="o">.</span><span class="na">timestamp</span> <span class="o">=</span> <span class="n">timestamp</span><span class="o">;</span>
+        <span class="o">}</span>
+        <span class="kd">public</span> <span class="nf">Node</span><span class="o">(){}</span>
+    <span class="o">}</span>
+
+    <span class="kd">public</span> <span class="kd">static</span> <span class="kt">void</span> <span class="nf">main</span><span class="o">(</span><span class="nc">String</span><span class="o">[]</span> <span class="n">args</span><span class="o">)</span> <span class="o">{</span>
+        <span class="no">LRU</span><span class="o">&lt;</span><span class="nc">String</span><span class="o">,</span><span class="nc">Integer</span><span class="o">&gt;</span> <span class="n">lru</span> <span class="o">=</span> <span class="k">new</span> <span class="no">LRU</span><span class="o">&lt;&gt;(</span><span class="mi">3</span><span class="o">,</span><span class="mi">1000</span><span class="o">);</span>
+        <span class="n">lru</span><span class="o">.</span><span class="na">put</span><span class="o">(</span><span class="s">"001"</span><span class="o">,</span><span class="mi">1</span><span class="o">);</span>
+        <span class="n">lru</span><span class="o">.</span><span class="na">put</span><span class="o">(</span><span class="s">"002"</span><span class="o">,</span><span class="mi">2</span><span class="o">);</span>
+        <span class="n">lru</span><span class="o">.</span><span class="na">put</span><span class="o">(</span><span class="s">"003"</span><span class="o">,</span><span class="mi">3</span><span class="o">);</span>
+        <span class="n">lru</span><span class="o">.</span><span class="na">get</span><span class="o">(</span><span class="s">"003"</span><span class="o">);</span>
+        <span class="n">lru</span><span class="o">.</span><span class="na">put</span><span class="o">(</span><span class="s">"004"</span><span class="o">,</span><span class="mi">4</span><span class="o">);</span>
+        <span class="n">lru</span><span class="o">.</span><span class="na">put</span><span class="o">(</span><span class="s">"005"</span><span class="o">,</span><span class="mi">5</span><span class="o">);</span>
+        <span class="n">lru</span><span class="o">.</span><span class="na">put</span><span class="o">(</span><span class="s">"006"</span><span class="o">,</span><span class="mi">6</span><span class="o">);</span>
+    <span class="o">}</span>
+<span class="o">}</span>
+</code></pre></div></div>]]></content><author><name></name></author><category term="java" /><category term="经典面试题" /><summary type="html"><![CDATA[用java实现带缓存时间的lru,只是一个简单的例子，还有很多不足，例如lru中的元素过期了不能及时删除，只有在put或者get的时候才会进行删除操作，同时，对于put了相同key的元素，没有更新该元素的时间戳以及新值]]></summary></entry><entry><title type="html">Welcome to Jekyll!</title><link href="http://localhost:4000/jekyll/update/2022/07/28/welcome-to-jekyll.html" rel="alternate" type="text/html" title="Welcome to Jekyll!" /><published>2022-07-28T14:12:52+08:00</published><updated>2022-07-28T14:12:52+08:00</updated><id>http://localhost:4000/jekyll/update/2022/07/28/welcome-to-jekyll</id><content type="html" xml:base="http://localhost:4000/jekyll/update/2022/07/28/welcome-to-jekyll.html"><![CDATA[<p>You’ll find this post in your <code class="language-plaintext highlighter-rouge">_posts</code> directory. Go ahead and edit it and re-build the site to see your changes. You can rebuild the site in many different ways, but the most common way is to run <code class="language-plaintext highlighter-rouge">jekyll serve</code>, which launches a web server and auto-regenerates your site when a file is updated.</p>
+
+<p>Jekyll requires blog post files to be named according to the following format:</p>
+
+<p><code class="language-plaintext highlighter-rouge">YEAR-MONTH-DAY-title.MARKUP</code></p>
+
+<p>Where <code class="language-plaintext highlighter-rouge">YEAR</code> is a four-digit number, <code class="language-plaintext highlighter-rouge">MONTH</code> and <code class="language-plaintext highlighter-rouge">DAY</code> are both two-digit numbers, and <code class="language-plaintext highlighter-rouge">MARKUP</code> is the file extension representing the format used in the file. After that, include the necessary front matter. Take a look at the source for this post to get an idea about how it works.</p>
+
+<p>Jekyll also offers powerful support for code snippets:</p>
+
+<figure class="highlight"><pre><code class="language-ruby" data-lang="ruby"><span class="k">def</span> <span class="nf">print_hi</span><span class="p">(</span><span class="nb">name</span><span class="p">)</span>
+  <span class="nb">puts</span> <span class="s2">"Hi, </span><span class="si">#{</span><span class="nb">name</span><span class="si">}</span><span class="s2">"</span>
+<span class="k">end</span>
+<span class="n">print_hi</span><span class="p">(</span><span class="s1">'Tom'</span><span class="p">)</span>
+<span class="c1">#=&gt; prints 'Hi, Tom' to STDOUT.</span></code></pre></figure>
+
+<p>Check out the <a href="https://jekyllrb.com/docs/home">Jekyll docs</a> for more info on how to get the most out of Jekyll. File all bugs/feature requests at <a href="https://github.com/jekyll/jekyll">Jekyll’s GitHub repo</a>. If you have questions, you can ask them on <a href="https://talk.jekyllrb.com/">Jekyll Talk</a>.</p>]]></content><author><name></name></author><category term="jekyll" /><category term="update" /><summary type="html"><![CDATA[You’ll find this post in your _posts directory. Go ahead and edit it and re-build the site to see your changes. You can rebuild the site in many different ways, but the most common way is to run jekyll serve, which launches a web server and auto-regenerates your site when a file is updated.]]></summary></entry></feed>
