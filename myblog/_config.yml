@@ -21,7 +21,7 @@
 title: this is a title
 email: mrzyl@hotmail.com
 description: stay foolish, stay hungry
-#baseurl: "blog" # the subpath of your site, e.g. /blog
+baseurl: "/blog" # the subpath of your site, e.g. /blog
 url: "mrzyl.github.io" # the base hostname & protocol for your site, e.g. http://example.com
 #twitter_username: jekyllrb
 github_username:  mrzyl
